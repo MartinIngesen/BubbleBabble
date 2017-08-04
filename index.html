@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Bubble Babble</title>
+    <link rel="stylesheet" href="https://gitcdn.link/repo/Chalarangelo/mini.css/master/dist/mini-dark.min.css">
+    <!-- You should properly set the path from the main file. -->
+  </head>
+  <body>
+<div class="container">
+  <div class="row cols-sm-12 cols-md-10">
+    <div class="col-md-offset-1">
+      <br />
+      <h1>Encode Decode Bubble Babble Online</h1>
+      <p>Try for example "xigak-nyryk-humil-bosek-sonax", which should return "Pineapple", and the other way around.</p>
+
+      <form>
+        <div class="input-group vertical">
+          <label for="bubblebabble">Input</label>
+          <textarea name="name" id="bubblebabble"></textarea>
+        </div>
+        <div class="input-group fluid">
+          <button type="button" id="encodeButton" name="button">Encode</button>
+          <button type="button" id="decodeButton" name="button">Decode</button>
+        </div>
+        <div class="input-group vertical">
+          <label for="out">Output</label>
+          <textarea readonly name="name" id="out"></textarea>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<footer>
+  <div class="col-sm col-md-10 col-md-offset-1">
+    <p>Heavily based on <a href="https://github.com/eur0pa/bubblepy">eur0pa's implementation in Python</a>. See <a href="http://bohwaz.net/archives/web/Bubble_Babble.html">http://bohwaz.net/archives/web/Bubble_Babble.html</a> for details.</p>
+    <p>By <a href="https://twitter.com/Mrtn9">Martin "Mrtn" Ingesen</a></p>
+  </div>
+</footer>
+    <script type="text/javascript">
+      document.getElementById("encodeButton").addEventListener("click",
+      function(){
+          var text = document.getElementById("bubblebabble").value;
+
+          text = encode(text)
+
+          document.getElementById("out").innerHTML = text;
+      });
+
+      document.getElementById("decodeButton").addEventListener("click",
+      function(){
+          var text = document.getElementById("bubblebabble").value;
+
+          text = decode(text)
+
+          document.getElementById("out").innerHTML = text;
+      });
+
+      function encode(input){
+
+        var V = new Array("a", "e", "i", "o", "u", "y")
+        var C = new Array("b", "c", "d", "f", "g", "h", "k", "l", "m", "n", "p", "r", "s", "t", "v", "z", "x")
+
+        out = 'x'
+        c = 1
+
+        for(var i=0; i < input.length + 1; i+=2){
+
+          if(i >= input.length){
+            out += V[c % 6] + C[16] + V[C/6]
+            break
+          }
+
+          byte1 = input.charCodeAt(i)
+          out += V[(((byte1 >> 6) & 3) + c) % 6]
+          out += C[(byte1 >> 2) & 15]
+          out += V[Math.floor(((byte1 & 3) + (c / 6)) % 6)]
+
+          if((i + 1) >= input.length){
+            break
+          }
+
+          byte2 = input.charCodeAt(i + 1)
+          out += C[(byte2 >> 4) & 15]
+          out += "-"
+          out += C[byte2 & 15]
+
+          c = (c * 5 + byte1 * 7 + byte2) % 36
+
+        }
+
+        out += 'x'
+
+        return out
+      }
+
+      function decode(input){
+        c = 1;
+
+        if(input[0] != 'x'){
+          return "Corrupt string at offset 0"
+        }
+        if(input[input.length - 1] != 'x'){
+          return "Corrupt string at offset -1"
+        }
+        if(input.length != 5 && (input.length % 6) != 5){
+          return "Corrupt string, wrong length"
+        }
+
+        // Remove x from start and end
+        input = input.substring(1, input.length - 1)
+
+        // Split into tuples
+        input = input.match(/.{1,6}/g)
+
+        last_tuple = input.length - 1
+
+        //console.log(last_tuple)
+
+        out = ''
+
+        //console.log(input)
+
+        for(var k=0; k < input.length; k++){
+          pos = k * 6
+          tup = decode_tuple(input[k])
+
+          //console.log(pos, tup)
+          //console.log("--------------")
+
+          if(k == last_tuple){
+            if(tup[1] == 16){
+              if(tup[0] != (c % 6)){
+                return "Corrupt string at offset " + pos
+              }
+              if(tup[2] != Math.floor((c / 6))){
+                return "Corrupt string at offset " + (pos + 2)
+              }
+            }else{
+              byte = decode_3way_byte(tup[0], tup[1], tup[2], pos, c)
+              out += String.fromCharCode(byte)
+            }
+          }else{
+              byte1 = decode_3way_byte(tup[0], tup[1], tup[2], pos, c)
+              byte2 = decode_2way_byte(tup[3], tup[5], pos)
+
+              out += String.fromCharCode(byte1)
+              out += String.fromCharCode(byte2)
+
+              c = (c * 5 + byte1 * 7 + byte2) % 36
+          }
+        }
+
+        return out
+
+      }
+
+      function decode_tuple(input){
+        var V = new Array("a", "e", "i", "o", "u", "y")
+        var C = new Array("b", "c", "d", "f", "g", "h", "k", "l", "m", "n", "p", "r", "s", "t", "v", "z", "x")
+
+        var tupl = new Array(V.indexOf(input[0]), C.indexOf(input[1]), V.indexOf(input[2]))
+
+        if(input.length > 3){
+          tupl.push(C.indexOf(input[3]))
+          tupl.push('-')
+          tupl.push(C.indexOf(input[5]))
+        }
+
+        return tupl
+      }
+
+      function decode_3way_byte(a1, a2, a3, offset, c){
+        high2 = (a1 - (c % 6) + 6) % 6
+
+        if(high2 >= 4){
+          return false
+        }
+        if(a2 > 16){
+          return false
+        }
+
+        mid4 = a2
+        low2 = (a3 - Math.floor((c / 6 % 6)) + 6) % 6
+
+        if(low2 >= 4){
+          return false
+        }
+
+        return high2 << 6 | mid4 << 2 | low2
+      }
+
+      function decode_2way_byte(a1, a2, offset){
+        if(a1 > 16){
+          return false
+        }
+        if(a2 > 16){
+          return false
+        }
+
+        return Math.floor((a1 << 4) | a2)
+      }
+
+    </script>
+  </body>
+</html>
